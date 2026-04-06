@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Attendance System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c27;--border:#2a2a3a;--accent:#00e5a0;--accent2:#7c6aff;--danger:#ff6a6a;--warning:#ffb547;--text:#e8e8f0;--muted:#6b6b80;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,160,.03)1px,transparent 1px),linear-gradient(90deg,rgba(0,229,160,.03)1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:100;background:rgba(10,10,15,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 12px;display:flex;align-items:center;height:54px;gap:2px;overflow-x:auto;}
+  nav::-webkit-scrollbar{display:none;}
+  .nav-logo{font-size:13px;font-weight:800;letter-spacing:2px;color:var(--accent);text-transform:uppercase;margin-right:auto;white-space:nowrap;}
+  .nav-logo span{color:var(--text);}
+  .tab-btn{padding:7px 11px;border:none;background:transparent;color:var(--muted);font-family:'Syne',sans-serif;font-size:11px;font-weight:700;cursor:pointer;border-radius:6px;transition:all .2s;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;flex-shrink:0;}
+  .tab-btn:hover{color:var(--text);background:var(--surface2);}
+  .tab-btn.active{color:var(--accent);background:rgba(0,229,160,.1);}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);margin-left:4px;flex-shrink:0;transition:all .3s;}
+  .sync-dot.green{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 1.5s infinite;}
+  .sync-dot.orange{background:var(--warning);animation:pulse .8s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* PAGES */
+  .page{display:none;padding:20px 14px;max-width:1000px;margin:0 auto;position:relative;z-index:1;}
+  .page.active{display:block;animation:fadeUp .25s ease;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .page-title{font-size:24px;font-weight:800;margin-bottom:3px;}
+  .page-title span{color:var(--accent);}
+  .page-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:20px;}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;}
+  .card-title{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+
+  /* STATS */
+  .stats-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+  @media(min-width:560px){.stats-row{grid-template-columns:repeat(4,1fr);}}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;overflow:hidden;}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent);}
+  .stat-card.p::before{background:var(--accent2);}
+  .stat-card.r::before{background:var(--danger);}
+  .stat-card.o::before{background:var(--warning);}
+  .stat-num{font-size:28px;font-weight:800;line-height:1;}
+  .stat-label{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:1px;text-transform:uppercase;font-family:'DM Mono',monospace;}
+
+  /* FORM */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media(max-width:480px){.form-grid{grid-template-columns:1fr;}}
+  .form-group{display:flex;flex-direction:column;gap:5px;}
+  .form-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);}
+  .form-input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;width:100%;}
+  .form-input:focus{border-color:var(--accent);}
+  .form-input::placeholder{color:var(--muted);}
+
+  /* BUTTONS */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .2s;}
+  .btn-primary{background:var(--accent);color:#000;}
+  .btn-primary:hover{background:#00ffb3;transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,229,160,.3);}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+  .btn-danger{background:rgba(255,106,106,.12);color:var(--danger);border:1px solid rgba(255,106,106,.25);}
+  .btn-danger:hover{background:rgba(255,106,106,.22);}
+  .btn-sm{padding:5px 10px;font-size:10px;}
+  .btn-full{width:100%;justify-content:center;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+
+  /* TABLE */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;}
+  th{text-align:left;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;white-space:nowrap;}
+  td{padding:11px 10px;font-size:13px;border-bottom:1px solid rgba(42,42,58,.4);}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(255,255,255,.015);}
+
+  /* BADGE */
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;font-family:'DM Mono',monospace;}
+  .bg{background:rgba(0,229,160,.14);color:var(--accent);}
+  .bp{background:rgba(124,106,255,.14);color:var(--accent2);}
+  .br{background:rgba(255,106,106,.14);color:var(--danger);}
+  .bo{background:rgba(255,181,71,.14);color:var(--warning);}
+
+  /* SCANNER */
+  .scanner-wrap{border:2px solid var(--border);border-radius:12px;overflow:hidden;background:#000;max-width:400px;margin:0 auto;}
+  #html5-qrcode-reader{width:100%;}
+  .scan-controls{display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap;}
+  .scanner-status{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+  .sdot{width:7px;height:7px;border-radius:50%;background:var(--muted);}
+  .sdot.on{background:var(--accent);box-shadow:0 0 5px var(--accent);animation:pulse 1.5s infinite;}
+  .scan-result{padding:16px;border-radius:10px;margin-top:14px;text-align:center;animation:popIn .3s cubic-bezier(.34,1.56,.64,1);}
+  @keyframes popIn{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+  .sr-success{background:rgba(0,229,160,.09);border:1px solid rgba(0,229,160,.28);}
+  .sr-error{background:rgba(255,106,106,.09);border:1px solid rgba(255,106,106,.28);}
+  .sr-warn{background:rgba(255,181,71,.09);border:1px solid rgba(255,181,71,.28);}
+  .scan-name{font-size:19px;font-weight:800;margin-bottom:4px;}
+  .scan-info{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+  /* SEARCH */
+  .search-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+  .search-input{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;flex:1;min-width:130px;transition:border-color .2s;}
+  .search-input:focus{border-color:var(--accent);}
+
+  /* QR GRID */
+  .qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px;margin-top:16px;}
+  .qr-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center;transition:border-color .2s;}
+  .qr-card:hover{border-color:var(--accent);}
+  .qr-wrap{background:#fff;border-radius:8px;padding:10px;display:inline-block;margin-bottom:10px;}
+  .qr-mname{font-size:13px;font-weight:700;}
+  .qr-mid{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:3px;}
+
+  /* LOADING / EMPTY */
+  .loading{text-align:center;padding:28px;color:var(--muted);}
+  .spinner{display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite;margin-bottom:6px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .empty{text-align:center;padding:32px;color:var(--muted);}
+  .empty-icon{font-size:34px;margin-bottom:8px;}
+  .empty-text{font-size:13px;}
+
+  /* TOAST */
+  #toast{position:fixed;bottom:18px;right:14px;z-index:9999;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:11px 16px;max-width:270px;transform:translateY(70px);opacity:0;transition:all .28s cubic-bezier(.34,1.56,.64,1);font-size:13px;line-height:1.4;}
+  #toast.show{transform:translateY(0);opacity:1;}
+  #toast.tg{border-color:var(--accent);color:var(--accent);}
+  #toast.tr{border-color:var(--danger);color:var(--danger);}
+  #toast.to{border-color:var(--warning);color:var(--warning);}
+
+  /* SETTINGS */
+  .settings-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">◈ <span>Attend</span>QR</div>
+  <button class="tab-btn active" onclick="showPage('dashboard',this)">Dash</button>
+  <button class="tab-btn" onclick="showPage('members',this)">Members</button>
+  <button class="tab-btn" onclick="showPage('scanner',this)">Scan</button>
+  <button class="tab-btn" onclick="showPage('records',this)">Records</button>
+  <button class="tab-btn" onclick="showPage('qrcodes',this)">QR Codes</button>
+  <button class="tab-btn" onclick="showPage('settings',this)">⚙</button>
+  <div class="sync-dot" id="sync-dot"></div>
+</nav>
+
+<!-- ═══ DASHBOARD ═══════════════════════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+  <div class="page-title">Overview <span>↗</span></div>
+  <div class="page-sub" id="sync-label">// connecting to Google Sheet...</div>
+  <div class="stats-row">
+    <div class="stat-card">  <div class="stat-num" id="s-mem">—</div><div class="stat-label">Total Members</div></div>
+    <div class="stat-card p"><div class="stat-num" id="s-today">—</div><div class="stat-label">Present Today</div></div>
+    <div class="stat-card r"><div class="stat-num" id="s-abs">—</div><div class="stat-label">Absent Today</div></div>
+    <div class="stat-card o"><div class="stat-num" id="s-logs">—</div><div class="stat-label">Total Check-ins</div></div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="card-title" style="margin:0;">Recent Check-ins</div>
+      <button class="btn btn-secondary btn-sm" onclick="refreshAll()">↻ Refresh</button>
+    </div>
+    <div id="d-load" class="loading"><div class="spinner"></div><div>Loading from Google Sheet...</div></div>
+    <div class="table-wrap" id="d-wrap" style="display:none;">
+      <table><thead><tr><th>Member</th><th>Time</th><th>Date</th><th>Method</th></tr></thead>
+      <tbody id="d-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MEMBERS ══════════════════════════════════════════════════ -->
+<div class="page" id="page-members">
+  <div class="page-title">Members <span>+</span></div>
+  <div class="page-sub">// saved to your Google Sheet in real time</div>
+  <div class="card">
+    <div class="card-title">Add New Member</div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">Full Name *</label><input class="form-input" id="mn" placeholder="e.g. Alice Nakato"/></div>
+      <div class="form-group"><label class="form-label">Member ID *</label><input class="form-input" id="mi" placeholder="e.g. MBR-001"/></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="me" placeholder="alice@example.com"/></div>
+      <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="mp" placeholder="+256 700 000 000"/></div>
+    </div>
+    <div style="margin-top:12px;"><button class="btn btn-primary" id="btn-add" onclick="addMember()">➕ Add Member</button></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Member Registry</div>
+    <div class="search-row">
+      <input class="search-input" id="ms" placeholder="Search name or ID..." oninput="renderMembers()"/>
+      <span id="mc" style="font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;"></span>
+      <button class="btn btn-secondary btn-sm" onclick="loadMembers()">↻</button>
+    </div>
+    <div id="ml" class="loading"><div class="spinner"></div><div>Loading...</div></div>
+    <div class="table-wrap" id="mw" style="display:none;">
+      <table><thead><tr><th>Name</th><th>ID</th><th>Email</th><th>Phone</th><th></th></tr></thead>
+      <tbody id="mt"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCANNER ══════════════════════════════════════════════════ -->
+<div class="page" id="page-scanner">
+  <div class="page-title">QR <span>Scanner</span></div>
+  <div class="page-sub">// scan → saves instantly to Google Sheet</div>
+  <div style="max-width:440px;margin:0 auto;">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="card-title" style="margin:0;">Camera</div>
+        <div class="scanner-status"><div class="sdot" id="sdot"></div><span id="sstat">Stopped</span></div>
+      </div>
+      <div class="scanner-wrap"><div id="html5-qrcode-reader"></div></div>
+      <div class="scan-controls">
+        <button class="btn btn-primary" id="btn-start" onclick="startScanner()">▶ Start Scanner</button>
+        <button class="btn btn-secondary" id="btn-stop" onclick="stopScanner()" style="display:none;">⏹ Stop</button>
+      </div>
+    </div>
+    <div id="scan-area"></div>
+    <div class="card">
+      <div class="card-title">Manual Check-in</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input class="form-input" id="man-id" placeholder="Type Member ID" style="flex:1;"/>
+        <button class="btn btn-secondary" onclick="manualCheckin()">Check In</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ RECORDS ══════════════════════════════════════════════════ -->
+<div class="page" id="page-records">
+  <div class="page-title">Attendance <span>Records</span></div>
+  <div class="page-sub">// full log from Google Sheet</div>
+  <div class="card">
+    <div class="search-row">
+      <input class="search-input" id="rs" placeholder="Search name or ID..." oninput="renderRecords()"/>
+      <input type="date" class="search-input" id="rd" style="flex:0;min-width:148px;" onchange="renderRecords()"/>
+      <button class="btn btn-secondary btn-sm" onclick="clearDate()">Clear</button>
+      <button class="btn btn-primary btn-sm" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-danger btn-sm" onclick="clearAll()" title="Clear all records">🗑</button>
+    </div>
+    <div id="rl" class="loading"><div class="spinner"></div><div>Loading...</div></div>
+    <div class="table-wrap" id="rw" style="display:none;">
+      <table><thead><tr><th>Name</th><th>ID</th><th>Date</th><th>Time</th><th>Method</th></tr></thead>
+      <tbody id="rt"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ QR CODES ═════════════════════════════════════════════════ -->
+<div class="page" id="page-qrcodes">
+  <div class="page-title">QR <span>Codes</span></div>
+  <div class="page-sub">// printable QR codes for every member</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+    <button class="btn btn-primary" onclick="generateQRs()">⚡ Generate All</button>
+    <button class="btn btn-secondary" onclick="window.print()">🖨 Print</button>
+  </div>
+  <div class="qr-grid" id="qr-grid"></div>
+</div>
+
+<!-- ═══ SETTINGS ═════════════════════════════════════════════════ -->
+<div class="page" id="page-settings">
+  <div class="page-title">Settings <span>⚙</span></div>
+  <div class="page-sub">// manage connection & preferences</div>
+  <div class="card">
+    <div class="card-title">Google Apps Script URL</div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.6;">If you redeploy your script, paste the new URL here.</p>
+    <div class="form-group">
+      <label class="form-label">Web App URL</label>
+      <input class="form-input" id="set-url" style="font-size:11px;"/>
+    </div>
+    <div class="settings-row">
+      <button class="btn btn-primary" onclick="saveSettingsUrl()">Save URL</button>
+      <button class="btn btn-secondary" onclick="testConn()">Test Connection</button>
+    </div>
+    <div id="test-out" style="margin-top:10px;font-size:12px;font-family:'DM Mono',monospace;"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Connected Sheet</div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.8;font-family:'DM Mono',monospace;">
+      Sheet ID: 1xMNNGnBA4W-T0cIB4Xc8sLHGHotRTMjeYzyhyUzBv9c<br>
+      Auto-refreshes every 30s on Dashboard<br>
+      Last 100 records shown in Records tab
+    </p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══ WEB APP URL — pre-filled ══════════════════════════════════════
+const DEFAULT_URL = "https://script.google.com/macros/s/AKfycbw7-imGFoOPklTsEO_eR-MOpF5Tm-nkfhcKGn_tbvQkgkYCDBrDQb8XAu37uW-A7B-b/exec";
+const URL_KEY     = "attendqr_url_v3";
+let WEB_URL = localStorage.getItem(URL_KEY) || DEFAULT_URL;
+localStorage.setItem(URL_KEY, WEB_URL);
+
+let members = [], records = [];
+
+// Set settings field
+document.getElementById("set-url").value = WEB_URL;
+
+// ══ API ═══════════════════════════════════════════════════════════
+async function apiGet(action) {
+  const r = await fetch(WEB_URL + "?action=" + action + "&t=" + Date.now());
+  return r.json();
+}
+async function apiPost(data) {
+  const r = await fetch(WEB_URL, { method:"POST", body: JSON.stringify(data) });
+  return r.json();
+}
+
+// ══ NAVIGATION ════════════════════════════════════════════════════
+function showPage(name, btn) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("page-" + name).classList.add("active");
+  if (btn) btn.classList.add("active");
+  if (name === "dashboard") refreshAll();
+  if (name === "members")   loadMembers();
+  if (name === "records")   loadRecords();
+  if (name === "qrcodes")   generateQRs();
+  if (name !== "scanner")   stopScanner();
+}
+
+// ══ SYNC STATUS ═══════════════════════════════════════════════════
+function setSyncing(on) {
+  const d = document.getElementById("sync-dot");
+  d.className = "sync-dot" + (on ? " orange" : " green");
+}
+
+// ══ REFRESH ALL ═══════════════════════════════════════════════════
+async function refreshAll() {
+  setSyncing(true);
+  try {
+    const [stats, recs] = await Promise.all([apiGet("getStats"), apiGet("getAttendance")]);
+    if (stats.success) {
+      document.getElementById("s-mem").textContent   = stats.totalMembers;
+      document.getElementById("s-today").textContent = stats.presentToday;
+      document.getElementById("s-abs").textContent   = stats.absentToday;
+      document.getElementById("s-logs").textContent  = stats.totalLogs;
+    }
+    if (recs.success) { records = recs.records; renderDash(); }
+    document.getElementById("sync-label").textContent = "// synced at " + new Date().toLocaleTimeString();
+    setSyncing(false);
+  } catch(e) {
+    document.getElementById("sync-dot").className = "sync-dot";
+    toast("Sync failed — check connection", "r");
+  }
+}
+
+// ══ DASHBOARD ════════════════════════════════════════════════════
+function renderDash() {
+  hide("d-load"); show("d-wrap");
+  const recent = records.slice(0,12);
+  const tbody  = document.getElementById("d-tbody");
+  if (!recent.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No check-ins yet — start scanning!</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = recent.map(r => `
+    <tr>
+      <td><b>${r.memberName}</b></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;">${r.time}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;">${r.date}</td>
+      <td><span class="badge ${r.method==='QR Scan'?'bg':'bp'}">${r.method}</span></td>
+    </tr>`).join("");
+}
+
+// ══ MEMBERS ══════════════════════════════════════════════════════
+async function loadMembers() {
+  show("ml"); hide("mw");
+  try {
+    const d = await apiGet("getMembers");
+    if (d.success) { members = d.members; renderMembers(); }
+    else toast(d.error || "Failed to load", "r");
+  } catch(e) { toast("Failed to load members", "r"); }
+  hide("ml"); show("mw");
+}
+
+function renderMembers() {
+  const q    = document.getElementById("ms").value.toLowerCase();
+  const list = members.filter(m => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q));
+  document.getElementById("mc").textContent = list.length + " member" + (list.length !== 1 ? "s" : "");
+  const tbody = document.getElementById("mt");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">👥</div><div class="empty-text">No members yet — add one above</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(m => `
+    <tr>
+      <td><b>${m.name}</b></td>
+      <td><span class="badge bp">${m.id}</span></td>
+      <td style="font-size:12px;color:var(--muted);">${m.email || "—"}</td>
+      <td style="font-size:12px;color:var(--muted);">${m.phone || "—"}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMember('${m.id}','${m.name}')">Delete</button></td>
+    </tr>`).join("");
+}
+
+async function addMember() {
+  const name  = document.getElementById("mn").value.trim();
+  const id    = document.getElementById("mi").value.trim();
+  const email = document.getElementById("me").value.trim();
+  const phone = document.getElementById("mp").value.trim();
+  if (!name || !id) return toast("Name and ID are required", "r");
+  const btn = document.getElementById("btn-add");
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    const r = await apiPost({ action:"addMember", id, name, email, phone });
+    if (r.success) {
+      toast(r.message, "g");
+      ["mn","mi","me","mp"].forEach(i => document.getElementById(i).value = "");
+      loadMembers();
+    } else toast(r.message, "r");
+  } catch(e) { toast("Failed to save member", "r"); }
+  btn.disabled = false; btn.textContent = "➕ Add Member";
+}
+
+async function deleteMember(id, name) {
+  if (!confirm("Delete " + name + "?")) return;
+  try {
+    const r = await apiPost({ action:"deleteMember", id });
+    if (r.success) { toast("Member deleted", "r"); loadMembers(); }
+    else toast(r.message, "r");
+  } catch(e) { toast("Failed", "r"); }
+}
+
+// ══ SCANNER ══════════════════════════════════════════════════════
+let qr = null, scanning = false, lastCode = "", lastTime = 0;
+
+function startScanner() {
+  if (scanning) return;
+  qr = new Html5Qrcode("html5-qrcode-reader");
+  qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    (text) => {
+      const now = Date.now();
+      if (text === lastCode && now - lastTime < 3000) return;
+      lastCode = text; lastTime = now;
+      doCheckin(text, "QR Scan");
+    }, () => {}
+  ).then(() => {
+    scanning = true;
+    hide("btn-start"); show("btn-stop");
+    document.getElementById("sdot").classList.add("on");
+    document.getElementById("sstat").textContent = "Active — point at QR code";
+  }).catch(e => toast("Camera error: " + e, "r"));
+}
+
+function stopScanner() {
+  if (qr && scanning) {
+    qr.stop().then(() => {
+      scanning = false;
+      show("btn-start"); hide("btn-stop");
+      document.getElementById("sdot").classList.remove("on");
+      document.getElementById("sstat").textContent = "Stopped";
+    }).catch(() => {});
+  }
+}
+
+async function manualCheckin() {
+  const id = document.getElementById("man-id").value.trim();
+  if (!id) return toast("Enter a Member ID", "r");
+  document.getElementById("man-id").value = "";
+  await doCheckin(id, "Manual");
+}
+
+async function doCheckin(code, method) {
+  const memberId = code.startsWith("ATTENDQR:") ? code.replace("ATTENDQR:", "") : code;
+  try {
+    const r = await apiPost({ action:"checkin", memberId, method });
+    showResult(r);
+    if (r.success) refreshAll();
+  } catch(e) { toast("Check-in failed", "r"); }
+}
+
+function showResult(r) {
+  const area = document.getElementById("scan-area");
+  if (r.success) {
+    area.innerHTML = `<div class="scan-result sr-success">
+      <div style="font-size:26px;margin-bottom:5px;">✅</div>
+      <div class="scan-name" style="color:var(--accent);">${r.member.name}</div>
+      <div class="scan-info">ID: ${r.member.id} &nbsp;·&nbsp; ${r.record.time}</div>
+      <div class="scan-info" style="margin-top:3px;">✓ Saved to Google Sheet</div>
+    </div>`;
+  } else if (r.duplicate) {
+    area.innerHTML = `<div class="scan-result sr-warn">
+      <div style="font-size:26px;margin-bottom:5px;">⚠️</div>
+      <div class="scan-name" style="color:var(--warning);">${r.member.name}</div>
+      <div class="scan-info">${r.message}</div>
+    </div>`;
+  } else {
+    area.innerHTML = `<div class="scan-result sr-error">
+      <div style="font-size:26px;margin-bottom:5px;">❌</div>
+      <div class="scan-name" style="color:var(--danger);">Not Found</div>
+      <div class="scan-info">${r.message}</div>
+    </div>`;
+  }
+  setTimeout(() => { area.innerHTML = ""; }, 5000);
+}
+
+// ══ RECORDS ══════════════════════════════════════════════════════
+async function loadRecords() {
+  show("rl"); hide("rw");
+  try {
+    const d = await apiGet("getAttendance");
+    if (d.success) { records = d.records; renderRecords(); }
+  } catch(e) { toast("Failed to load records", "r"); }
+  hide("rl"); show("rw");
+}
+
+function renderRecords() {
+  const q    = document.getElementById("rs").value.toLowerCase();
+  const date = document.getElementById("rd").value;
+  const list = records.filter(r =>
+    (r.memberName.toLowerCase().includes(q) || r.memberId.toLowerCase().includes(q)) &&
+    (date ? r.date === date : true)
+  );
+  const tbody = document.getElementById("rt");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">📭</div><div class="empty-text">No records found</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(r => `
+    <tr>
+      <td><b>${r.memberName}</b></td>
+      <td><span class="badge bp">${r.memberId}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;">${r.date}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;">${r.time}</td>
+      <td><span class="badge ${r.method === 'QR Scan' ? 'bg' : 'bp'}">${r.method}</span></td>
+    </tr>`).join("");
+}
+
+function clearDate() { document.getElementById("rd").value = ""; renderRecords(); }
+
+async function clearAll() {
+  if (!confirm("Delete ALL attendance records from Google Sheet?\nThis cannot be undone!")) return;
+  try {
+    const r = await apiPost({ action:"clearRecords" });
+    if (r.success) { records = []; renderRecords(); refreshAll(); toast("All records cleared", "r"); }
+  } catch(e) { toast("Failed", "r"); }
+}
+
+function exportCSV() {
+  if (!records.length) return toast("No records to export", "r");
+  const csv = "Name,Member ID,Date,Time,Method\n" +
+    records.map(r => `"${r.memberName}","${r.memberId}","${r.date}","${r.time}","${r.method}"`).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type:"text/csv" }));
+  a.download = "attendance_" + new Date().toLocaleDateString("en-CA") + ".csv";
+  a.click();
+  toast("CSV downloaded!", "g");
+}
+
+// ══ QR CODES ═════════════════════════════════════════════════════
+async function generateQRs() {
+  const grid = document.getElementById("qr-grid");
+  if (!members.length) {
+    // Try loading first
+    try {
+      const d = await apiGet("getMembers");
+      if (d.success) members = d.members;
+    } catch(e) {}
+  }
+  if (!members.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🔲</div><div class="empty-text">Add members first, then generate QR codes</div></div>`;
+    return;
+  }
+  grid.innerHTML = members.map(m => `
+    <div class="qr-card">
+      <div class="qr-wrap"><div id="qr-${m.id.replace(/[^a-z0-9]/gi,'_')}"></div></div>
+      <div class="qr-mname">${m.name}</div>
+      <div class="qr-mid">${m.id}</div>
+    </div>`).join("");
+
+  members.forEach(m => {
+    const sid = m.id.replace(/[^a-z0-9]/gi,'_');
+    const el  = document.getElementById("qr-" + sid);
+    if (el && !el.hasChildNodes()) {
+      try {
+        new QRCode(el, {
+          text: m.id,
+          width: 130, height: 130,
+          colorDark: "#000000", colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+      } catch(e) {}
+    }
+  });
+}
+
+// ══ SETTINGS ═════════════════════════════════════════════════════
+function saveSettingsUrl() {
+  const v = document.getElementById("set-url").value.trim();
+  if (!v.includes("script.google.com")) return toast("Invalid URL", "r");
+  WEB_URL = v;
+  localStorage.setItem(URL_KEY, v);
+  toast("URL saved!", "g");
+  refreshAll();
+}
+
+async function testConn() {
+  const el = document.getElementById("test-out");
+  el.style.color = "var(--muted)";
+  el.textContent = "Testing connection...";
+  try {
+    const r = await apiGet("ping");
+    if (r.success) {
+      el.style.color = "var(--accent)";
+      el.textContent = "✅ Connected — server responded at " + r.time;
+    } else {
+      el.style.color = "var(--danger)";
+      el.textContent = "❌ Error: " + (r.error || "Unknown");
+    }
+  } catch(e) {
+    el.style.color = "var(--danger)";
+    el.textContent = "❌ Failed — make sure deploy access is set to Anyone";
+  }
+}
+
+// ══ HELPERS ══════════════════════════════════════════════════════
+function show(id) { const e = document.getElementById(id); if(e) e.style.display = ""; }
+function hide(id) { const e = document.getElementById(id); if(e) e.style.display = "none"; }
+
+function toast(msg, type = "g") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = "show t" + type;
+  setTimeout(() => { el.className = ""; }, 3500);
+}
+
+// ══ BOOT ═════════════════════════════════════════════════════════
+refreshAll();
+
+// Auto-refresh dashboard every 30s
+setInterval(() => {
+  if (document.getElementById("page-dashboard").classList.contains("active")) refreshAll();
+}, 30000);
+</script>
+</body>
+</html>
